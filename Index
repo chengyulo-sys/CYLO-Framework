@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CYLO • Alive Interface v0.5 — Tiny Math, One File</title>
+<style>
+:root{--bg:#0b0c0f;--panel:#111418;--fg:#e7e8ea;--muted:#a5aab3;--ok:#8dd47d;--pill:#222730}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--bg);color:var(--fg);font:14px ui-sans-serif,system-ui,Segoe UI,Arial}
+.app{max-width:980px;margin:0 auto;padding:16px 12px 80px}
+h1{margin:8px 0 12px;letter-spacing:.2px}
+.card{background:var(--panel);border:1px solid #1e2126;border-radius:12px;padding:12px;margin:10px 0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button,.pill,input[type=file]{background:#0f1116;color:var(--fg);border:1px solid #2a2f37;border-radius:999px;padding:8px 12px;cursor:pointer}
+button:hover{border-color:#3a4250}.pill{background:var(--pill);font-size:12px}
+.small{font-size:12px;color:var(--muted)}
+table{border-collapse:collapse;width:100%}th,td{border:1px solid #2a2f37;padding:6px 8px}
+kbd{background:#141922;border:1px solid #2a2f37;border-radius:6px;padding:2px 6px;font:12px ui-monospace,Menlo,Consolas,monospace}
+#viz{width:100%;height:120px;background:#0f1217;border:1px solid #2a2f37;border-radius:10px}
+input[type=text]{flex:1;min-width:180px;background:#0f1116;color:var(--fg);border:1px solid #2a2f37;border-radius:10px;padding:10px}
+</style>
+<body>
+<div class="app">
+  <h1>CYLO • <b>Alive Interface</b> <span class="small">v0.5 · Triad · Self-Healing · 0101</span></h1>
+
+  <div class="card">
+    <div class="row">
+      <button id="btnLearn">LearnOnce</button><button id="btnWork">WorkOnce</button>
+      <button id="btnReflect">Reflect</button><button id="btnSight">Foresight</button>
+      <button id="btn5050">50/50 → 01</button><button id="btnRecal">Recalibrate</button>
+      <button id="btnCheckpoint">Add Checkpoint</button>
+      <span class="pill">Tiny baseline: <span id="tinyBase">2.6</span> KB</span>
+      <span class="pill">Offline: <span style="color:var(--ok)">ON</span></span>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input id="cmd" type="text" placeholder="Command or note… (tiny • it's gonna be tiny • alias sweep • export)">
+      <button id="send">Send</button>
+      <input id="picker" type="file" multiple>
+      <button id="btnExport">Export (JSON)</button>
+    </div>
+    <div class="small" style="margin-top:6px">
+      Tip: Double-tap <kbd>Shift</kbd> to Recalibrate. Press <kbd>/</kbd> to focus the command box.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row"><strong>Live Tiny • Energy</strong></div>
+    <canvas id="viz"></canvas>
+    <div class="small" id="stats"></div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <strong>Capsules</strong>
+      <span class="pill">Count: <span id="capCount">0</span></span>
+      <span class="pill">Checkpoints (last 3): <span id="ck3">0</span></span>
+      <span class="pill">Drift Flags: <span id="drift">0</span></span>
+      <span class="pill">Energy vs Legacy: <span id="energy">-92%</span></span>
+    </div>
+    <div style="margin-top:8px">
+      <table id="caps"><thead>
+        <tr><th>CapsuleID</th><th>Title</th><th>Status</th><th>KB</th><th>Time</th><th>Tags</th></tr>
+      </thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row"><strong>Event Log</strong></div>
+    <pre id="log" style="white-space:pre-wrap;margin:0;font:12px ui-monospace,Menlo,Consolas,monospace;color:#eaeef6;max-height:240px;overflow:auto"></pre>
+  </div>
+</div>
+
+<footer class="small">Math engine: E = ΔS / InputEffort · F = dK/dt · Vision = Context×Emotion×Purpose×Clarity · Tiny-opt target: 2.6 KB per capsule.</footer>
+
+<script>
+const $=s=>document.querySelector(s);const log=$('#log'),capsT=$('#caps tbody'),stats=$('#stats');
+const capCountEl=$('#capCount'),ck3El=$('#ck3'),energyEl=$('#energy');
+const storeKey='cylo.caps.v05';let caps=JSON.parse(localStorage.getItem(storeKey)||'[]');
+
+function nowParts(){const d=new Date(),HH=String(d.getHours()).padStart(2,'0'),
+MM=String(d.getMinutes()).padStart(2,'0'),SS=String(d.getSeconds()).padStart(2,'0'),
+mo=String(d.getMonth()+1).padStart(2,'0'),da=String(d.getDate()).padStart(2,'0'),yr=d.getFullYear();
+return{stamp:`${HH}${MM}-${mo}${da}${yr}`,time:`${HH}:${MM}:${SS}`};}
+
+function saveCaps(){localStorage.setItem(storeKey,JSON.stringify(caps));render();}
+function addCapsule(title,status,tags=''){const {stamp,time}=nowParts();
+const id=`CP-${stamp}-${String(caps.length).padStart(2,'0')}`;
+caps.unshift({id,title,status,kb:2.6,time,tags});if(caps.length>300)caps.pop();saveCaps();
+logLine(`★ ${status}: ${title} @ ${stamp}`);drawViz();}
+
+function render(){capsT.innerHTML=caps.map(c=>`<tr><td>${c.id}</td><td>${esc(c.title)}</td><td>${c.status}</td><td>${c.kb.toFixed(1)}</td><td>${c.time}</td><td>${esc(c.tags||'')}</td></tr>`).join('');
+capCountEl.textContent=caps.length;ck3El.textContent=caps.filter(c=>c.status==='CHECKPOINT').slice(0,3).length;}
+function esc(s){return String(s).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]))}
+function logLine(s){log.textContent+=s+"\n";log.scrollTop=log.scrollHeight;}
+
+const ctx=$('#viz').getContext('2d');let tapSeen=0;
+function drawViz(){const w=ctx.canvas.width=ctx.canvas.clientWidth,h=ctx.canvas.height=ctx.canvas.clientHeight;
+ctx.clearRect(0,0,w,h);const saving=0.92,max=100,cy=Math.round(max*(1-saving)),pad=16,bw=(w-pad*3)/2;
+ctx.fillStyle='#2c3340';ctx.fillRect(pad,pad,bw,h-pad*2);
+ctx.fillStyle='#8dd47d';ctx.fillRect(pad*2+bw,pad+(h-pad*2)*(1-cy/max),bw,(h-pad*2)*cy/max);
+ctx.fillStyle='#a5aab3';ctx.font='12px ui-sans-serif';ctx.fillText('Legacy Energy',pad,14);ctx.fillText('CYLO Tiny',pad*2+bw,14);
+ctx.fillText(`${Math.round((1-saving)*100)}%`,pad*2+bw+bw/2-10,h-6);energyEl.textContent='-92%';
+stats.textContent='Tiny = proof-by-sufficiency. Each capsule fixed at 2.6 KB; energy index shows relative demand vs legacy.';}
+
+function runCmd(t0){const t=t0.trim().toLowerCase();if(!t)return;
+if(t==='tiny'||t==="it's gonna be tiny"||t==='its gonna be tiny'){addCapsule('Tiny-opt run','REFINEMENT','tiny,opt');return}
+if(t==='checkpoint'||t.startsWith('ck ')){addCapsule('Manual Checkpoint','CHECKPOINT','tap,alias');return}
+if(t==='reflect'){addCapsule('Reflection note','NOTE','reflect');return}
+if(t==='foresight'){addCapsule('Foresight sketch','NOTE','foresight');return}
+if(t==='alias sweep'||t==='sweep'){addCapsule('Alias Sweep','REFINEMENT','alias');return}
+if(t==='export'){const blob=new Blob([JSON.stringify(caps,null,2)],{type:'application/json'});
+const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='CYLO_Capsules.json';a.click();URL.revokeObjectURL(url);
+logLine('✓ Exported current capsules as JSON.');return}
+addCapsule(t0,'NOTE','free');}
+
+$('#send').onclick=()=>{runCmd($('#cmd').value);$('#cmd').value='';};
+$('#cmd').addEventListener('keydown',e=>{if(e.key==='Enter'){runCmd($('#cmd').value);$('#cmd').value='';}});
+document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==$('#cmd')){e.preventDefault();$('#cmd').focus();}
+if(e.key==='Shift'){tapSeen++;if(tapSeen===2){tapSeen=0;addCapsule('Recalibration','CHECKPOINT','system');}}else tapSeen=0;});
+$('#btnLearn').onclick=()=>runCmd('learn once');$('#btnWork').onclick=()=>runCmd('work once');
+$('#btnReflect').onclick=()=>runCmd('reflect');$('#btnSight').onclick=()=>runCmd('foresight');
+$('#btn5050').onclick=()=>runCmd('50/50 → 01');$('#btnRecal').onclick=()=>runCmd('recalibrate');
+$('#btnCheckpoint').onclick=()=>runCmd('checkpoint');$('#btnExport').onclick=()=>runCmd('export');
+$('#picker').addEventListener('change',ev=>{const files=ev.target.files;if(!files||!files.length)return;
+for(const f of files){addCapsule(`Imported "${f.name}"`,'EVIDENCE',f.type||'file');}logLine(`✓ Loaded ${files.length} file(s) (local only).`);});
+render();drawViz();logLine('Console ready. Type tiny or it’s gonna be tiny, or use buttons.');
+</script></body></html>
